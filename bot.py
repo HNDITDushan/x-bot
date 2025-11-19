@@ -13,10 +13,11 @@ API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
+BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 
 # --- Authenticate for API v1.1 (for media upload + retweet) ---
 auth = tweepy.OAuth1UserHandler(
-    API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET
+    API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET,BEARER_TOKEN
 )
 api = tweepy.API(auth)
 
@@ -27,6 +28,9 @@ client = tweepy.Client(
     access_token=ACCESS_TOKEN,
     access_token_secret=ACCESS_TOKEN_SECRET
 )
+
+read_client = tweepy.Client(bearer_token=BEARER_TOKEN)
+
 
 # 🖼️ Folder containing images
 IMAGE_FOLDER = "/Volumes/PortableSSD/Projects/x-bot/images"
@@ -59,38 +63,39 @@ def post_tweet():
 # ---------------------------------------------------------
 # 2️⃣ RETWEET FUNCTION EVERY 15 MINUTES
 # ---------------------------------------------------------
-TARGET_ACCOUNTS = ["SriLankaTweet", "SriLanka"]
+TARGET_ACCOUNTS = ["SriLankaTweet", "ManojNa85998637", "vidusaraonline"]
 
 def retweet_random():
     try:
-        # Pick one of the target accounts randomly
         selected_account = random.choice(TARGET_ACCOUNTS)
 
-        print(f"🔎 Checking tweets from: @{selected_account}")
+        print(f"🔎 Checking tweets from @{selected_account}")
+        
+        # Get user details using read-only client
+        user = read_client.get_user(username=selected_account)
+        user_id = user.data.id
 
-        # Fetch latest 10 tweets
-        tweets = api.user_timeline(
-            screen_name=selected_account,
-            count=10,
-            tweet_mode="extended"
+        # Fetch latest tweets (v2 read-only)
+        tweets = read_client.get_users_tweets(
+            id=user_id,
+            max_results=10,
+            exclude=["replies", "retweets"]
         )
 
-        if not tweets:
+        if not tweets.data:
             print("⚠️ No tweets found.")
             return
 
-        # Pick a random tweet
-        tweet = random.choice(tweets)
+        tweet = random.choice(tweets.data)
 
-        # Try retweeting
+        # Retweet using v1.1 API
         api.retweet(tweet.id)
+
         print(f"🔁 Retweeted @{selected_account}: https://twitter.com/{selected_account}/status/{tweet.id}")
 
-    except tweepy.TweepError as e:
-        if "You have already retweeted" in str(e):
-            print("⚠️ Already retweeted recently — skipping.")
-        else:
-            print("❌ Error:", e)
+    except Exception as e:
+        print("❌ Error:", e)
+
 
 
 # ---------------------------------------------------------
@@ -101,7 +106,7 @@ def retweet_random():
 schedule.every().day.at("09:30").do(post_tweet)
 
 # Retweet every 15 minutes
-schedule.every(15).minutes.do(retweet_random)
+schedule.every(20).minutes.do(retweet_random)
 
 print("🤖 Bot is running…")
 while True:
