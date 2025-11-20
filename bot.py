@@ -5,6 +5,11 @@ from dotenv import load_dotenv
 from datetime import datetime
 import schedule
 import time
+import feedparser
+import requests
+from bs4 import BeautifulSoup
+import requests
+import json
 
 # Load credentials
 load_dotenv()
@@ -61,42 +66,57 @@ def post_tweet():
 
 
 # ---------------------------------------------------------
-# 2️⃣ RETWEET FUNCTION EVERY 15 MINUTES
+# 2️⃣ RETWEET FUNCTION EVERY 20 MINUTES
 # ---------------------------------------------------------
-TARGET_ACCOUNTS = ["SriLankaTweet", "ManojNa85998637", "vidusaraonline"]
+
+from twikit import Client as TwiClient
+
+twi = TwiClient()
+
+# Login cookies folder
+COOKIE_FILE = "/Volumes/PortableSSD/Projects/x-bot/cookies.json"
+
+def twikit_login():
+    if os.path.exists(COOKIE_FILE):
+        twi.load_cookies(COOKIE_FILE)
+        print("🍪 Cookies loaded (no login required)")
+    else:
+        # FIRST TIME ONLY → manual login once
+        twi.login(
+            auth_info_1=os.getenv("X_USERNAME"),
+            auth_info_2=os.getenv("X_EMAIL"),
+            password=os.getenv("X_PASSWORD")
+        )
+        twi.save_cookies(COOKIE_FILE)
+        print("🔐 Login saved to cookies.json")
+
+twikit_login()
+
+
+TARGET_ACCOUNTS = ["SriLankaTweet", "SriLanka", "vidusaraonline", "ManojNa85998637"]
 
 def retweet_random():
     try:
-        selected_account = random.choice(TARGET_ACCOUNTS)
+        selected = random.choice(TARGET_ACCOUNTS)
+        print(f"🔎 Checking tweets from @{selected}")
 
-        print(f"🔎 Checking tweets from @{selected_account}")
-        
-        # Get user details using read-only client
-        user = read_client.get_user(username=selected_account)
-        user_id = user.data.id
+        # Get latest tweets (twikit v1.2 method)
+        tweets = twi.get_user_tweets(screen_name=selected, count=10)
 
-        # Fetch latest tweets (v2 read-only)
-        tweets = read_client.get_users_tweets(
-            id=user_id,
-            max_results=10,
-            exclude=["replies", "retweets"]
-        )
-
-        if not tweets.data:
-            print("⚠️ No tweets found.")
+        if not tweets:
+            print("⚠ No tweets found")
             return
 
-        tweet = random.choice(tweets.data)
+        tweet = random.choice(tweets)
 
-        # Retweet using v1.1 API
-        api.retweet(tweet.id)
-
-        print(f"🔁 Retweeted @{selected_account}: https://twitter.com/{selected_account}/status/{tweet.id}")
+        twi.retweet(tweet.id)
+        print(f"🔁 Retweeted: https://twitter.com/{selected}/status/{tweet.id}")
 
     except Exception as e:
-        print("❌ Error:", e)
-
-
+        if "You have already Retweeted this Tweet" in str(e):
+            print("⚠ Already retweeted — skipping")
+        else:
+            print("❌ Error:", e)
 
 # ---------------------------------------------------------
 # 3️⃣ SCHEDULER
@@ -105,8 +125,8 @@ def retweet_random():
 # Daily tweet at 09:30 AM
 schedule.every().day.at("09:30").do(post_tweet)
 
-# Retweet every 15 minutes
-schedule.every(20).minutes.do(retweet_random)
+# Retweet every 20 minutes
+schedule.every(5).minutes.do(retweet_random)
 
 print("🤖 Bot is running…")
 while True:
