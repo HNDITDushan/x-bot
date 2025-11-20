@@ -5,24 +5,18 @@ from dotenv import load_dotenv
 from datetime import datetime
 import schedule
 import time
-import feedparser
-import requests
-from bs4 import BeautifulSoup
-import requests
-import json
 
-# Load credentials
+# Load credentials from .env
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
-BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 
-# --- Authenticate for API v1.1 (for media upload + retweet) ---
+# --- Authenticate for API v1.1 (for media upload + retweet if needed later) ---
 auth = tweepy.OAuth1UserHandler(
-    API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET,BEARER_TOKEN
+    API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET
 )
 api = tweepy.API(auth)
 
@@ -34,101 +28,81 @@ client = tweepy.Client(
     access_token_secret=ACCESS_TOKEN_SECRET
 )
 
-read_client = tweepy.Client(bearer_token=BEARER_TOKEN)
-
-
 # 🖼️ Folder containing images
 IMAGE_FOLDER = "/Volumes/PortableSSD/Projects/x-bot/images"
 
-
-# ---------------------------------------------------------
-# 1️⃣ YOUR DAILY TWEET FUNCTION (KEEPING ORIGINAL)
-# ---------------------------------------------------------
-def post_tweet():
-    message = f"Good morning! ☀️ It's {datetime.now().strftime('%Y-%m-%d')} — have a great day!"
-
-    # Pick a random image
-    image_files = [f for f in os.listdir(IMAGE_FOLDER) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
-
-    if image_files:
-        random_image = random.choice(image_files)
-        image_path = os.path.join(IMAGE_FOLDER, random_image)
-
-        # Upload image using API v1.1
-        media = api.media_upload(image_path)
-
-        # Post tweet with image using Client (v2)
-        client.create_tweet(text=message, media_ids=[media.media_id])
-        print(f"✅ Tweet with image posted: {message} ({random_image})")
+def build_message(when: str) -> str:
+    """Return the message text based on 'morning' or 'night'."""
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    if when == "morning":
+        return f"Good morning! ☀️ It's {date_str}. 11:11 — Have a bright day!"
+    elif when == "night":
+        return f"Good evening! 🌙 It's {date_str}. 11:11 — Wishing you a peaceful night!"
     else:
-        client.create_tweet(text=message)
-        print("✅ Tweet (text only) posted:", message)
+        return f"It's {date_str} — Hello!"
 
-
-# ---------------------------------------------------------
-# 2️⃣ RETWEET FUNCTION EVERY 20 MINUTES
-# ---------------------------------------------------------
-
-from twikit import Client as TwiClient
-
-twi = TwiClient()
-
-# Login cookies folder
-COOKIE_FILE = "/Volumes/PortableSSD/Projects/x-bot/cookies.json"
-
-def twikit_login():
-    if os.path.exists(COOKIE_FILE):
-        twi.load_cookies(COOKIE_FILE)
-        print("🍪 Cookies loaded (no login required)")
-    else:
-        # FIRST TIME ONLY → manual login once
-        twi.login(
-            auth_info_1=os.getenv("X_USERNAME"),
-            auth_info_2=os.getenv("X_EMAIL"),
-            password=os.getenv("X_PASSWORD")
-        )
-        twi.save_cookies(COOKIE_FILE)
-        print("🔐 Login saved to cookies.json")
-
-twikit_login()
-
-
-TARGET_ACCOUNTS = ["SriLankaTweet", "SriLanka", "vidusaraonline", "ManojNa85998637"]
-
-def retweet_random():
+def post_tweet(when="morning"):
+    """Post tweet with an optional random image. 'when' is 'morning' or 'night'."""
     try:
-        selected = random.choice(TARGET_ACCOUNTS)
-        print(f"🔎 Checking tweets from @{selected}")
+        message = build_message(when)
 
-        # Get latest tweets (twikit v1.2 method)
-        tweets = twi.get_user_tweets(screen_name=selected, count=10)
+        # Pick a random image if available
+        image_files = []
+        try:
+            image_files = [f for f in os.listdir(IMAGE_FOLDER) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
+        except Exception as e:
+            # If folder not present or unreadable, just post text
+            print("⚠️ Could not read IMAGE_FOLDER:", e)
 
-        if not tweets:
-            print("⚠ No tweets found")
-            return
-
-        tweet = random.choice(tweets)
-
-        twi.retweet(tweet.id)
-        print(f"🔁 Retweeted: https://twitter.com/{selected}/status/{tweet.id}")
+        if image_files:
+            random_image = random.choice(image_files)
+            image_path = os.path.join(IMAGE_FOLDER, random_image)
+            try:
+                media = api.media_upload(image_path)
+                # media.media_id should work; fall back to media.media_id_string if available
+                media_id = getattr(media, "media_id", None) or getattr(media, "media_id_string", None)
+                if media_id:
+                    client.create_tweet(text=message, media_ids=[media_id])
+                    print(f"✅ [{when}] Tweet with image posted: {message} ({random_image})")
+                else:
+                    # fallback to posting text only if upload didn't return id
+                    client.create_tweet(text=message)
+                    print(f"⚠️ [{when}] Media uploaded but no media_id returned — posted text only: {message}")
+            except Exception as e:
+                print("❌ Error uploading media or posting tweet with image:", e)
+                # attempt posting text only
+                try:
+                    client.create_tweet(text=message)
+                    print(f"✅ [{when}] Tweet (text only, after media error) posted:", message)
+                except Exception as e2:
+                    print("❌ Failed to post text-only tweet after media error:", e2)
+        else:
+            # No image found or folder inaccessible
+            try:
+                client.create_tweet(text=message)
+                print(f"✅ [{when}] Tweet (text only) posted:", message)
+            except Exception as e:
+                print("❌ Error posting text-only tweet:", e)
 
     except Exception as e:
-        if "You have already Retweeted this Tweet" in str(e):
-            print("⚠ Already retweeted — skipping")
-        else:
-            print("❌ Error:", e)
+        print("❌ Unexpected error in post_tweet:", e)
 
-# ---------------------------------------------------------
-# 3️⃣ SCHEDULER
-# ---------------------------------------------------------
 
-# Daily tweet at 09:30 AM
-schedule.every().day.at("09:30").do(post_tweet)
+# -------------------------
+# Scheduling
+# -------------------------
+# Post at 11:11 AM (morning)
+schedule.every().day.at("11:11").do(post_tweet, when="morning")
 
-# Retweet every 20 minutes
-schedule.every(5).minutes.do(retweet_random)
+# Post at 11:11 PM (night)
+# 23:11 is 11:11 PM in 24-hour format
+schedule.every().day.at("23:11").do(post_tweet, when="night")
 
-print("🤖 Bot is running…")
+print("🤖 Bot is running… (scheduled for 11:11 AM and 11:11 PM daily)")
 while True:
-    schedule.run_pending()
+    try:
+        schedule.run_pending()
+    except Exception as e:
+        # keep bot alive even if a scheduled job raises
+        print("❌ Error while running scheduled jobs:", e)
     time.sleep(30)
