@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 from datetime import datetime, date
 import schedule
 import time
+from keep_alive import keep_alive
+
+keep_alive()
 
 # Load credentials from .env
 load_dotenv()
