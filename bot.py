@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 from datetime import datetime, date
 import schedule
 import time
-from keep_alive import keep_alive
-
-keep_alive()
 
 # Load credentials from .env
 load_dotenv()
@@ -136,8 +133,8 @@ schedule.every().day.at("11:11").do(post_tweet, when="morning")
 # 11:11 PM
 schedule.every().day.at("23:11").do(post_tweet, when="night")
 
-# 🎄 Christmas Countdown (daily at 09:00)
-schedule.every().day.at("09:00").do(post_christmas_countdown)
+# 🎄 Christmas Countdown (daily at 09:20)
+schedule.every().day.at("09:20").do(post_christmas_countdown)
 
 print("🤖 Bot Running…")
 print("⏰ 11:11 AM — Morning Tweet")
