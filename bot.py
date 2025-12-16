@@ -5,8 +5,11 @@ from dotenv import load_dotenv
 from datetime import datetime, date
 import schedule
 import time
+import requests
 
-# Load credentials from .env
+# ------------------------------------------------
+# Load credentials
+# ------------------------------------------------
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
@@ -14,13 +17,16 @@ API_SECRET = os.getenv("API_SECRET")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 
-# --- Authenticate for API v1.1 (media upload) ---
-auth = tweepy.OAuth1UserHandler(
-    API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET
-)
+IMAGE_FOLDER = "/Volumes/PortableSSD/Projects/x-bot/images"
+QUOTE_API_KEY = "4v1qDs7dntxBJRt3HhQtYg==r9UAOHXWYL484RVc"
+QUOTE_API_URL = "https://api.api-ninjas.com/v2/randomquotes?categories=success,wisdom"
+
+# ------------------------------------------------
+# Twitter Auth
+# ------------------------------------------------
+auth = tweepy.OAuth1UserHandler(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 api = tweepy.API(auth)
 
-# --- Authenticate for API v2 (tweet posting) ---
 client = tweepy.Client(
     consumer_key=API_KEY,
     consumer_secret=API_SECRET,
@@ -28,74 +34,59 @@ client = tweepy.Client(
     access_token_secret=ACCESS_TOKEN_SECRET
 )
 
-# 🖼️ Folder containing images for your regular tweets
-IMAGE_FOLDER = "/Volumes/PortableSSD/Projects/x-bot/images"
-
 # ------------------------------------------------
-# 11:11 Tweet Messages
+# Helper Functions
 # ------------------------------------------------
 
-def build_message(when: str) -> str:
-    """Return the message text based on 'morning' or 'night'."""
-    date_str = datetime.now().strftime('%Y-%m-%d')
-    if when == "morning":
-        return f"Good morning! ☀️ It's {date_str}. 11:11 — Have a bright day!"
-    elif when == "night":
-        return f"Good evening! 🌙 It's {date_str}. 11:11 — Wishing you a peaceful night!"
-    else:
-        return f"It's {date_str} — Hello!"
-
-
-def post_tweet(when="morning"):
-    """Post tweet with optional random image."""
+def get_random_image():
+    """Return a random image path or None."""
     try:
-        message = build_message(when)
+        files = [f for f in os.listdir(IMAGE_FOLDER)
+                 if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
 
-        # Pick a random image if available
-        image_files = []
-        try:
-            image_files = [f for f in os.listdir(IMAGE_FOLDER)
-                           if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
-        except Exception as e:
-            print("⚠️ Could not read IMAGE_FOLDER:", e)
+        return os.path.join(IMAGE_FOLDER, random.choice(files)) if files else None
+    except Exception:
+        return None
 
-        if image_files:
-            random_image = random.choice(image_files)
-            image_path = os.path.join(IMAGE_FOLDER, random_image)
 
-            try:
-                media = api.media_upload(image_path)
-                media_id = getattr(media, "media_id", None) or getattr(media, "media_id_string", None)
-
-                if media_id:
-                    client.create_tweet(text=message, media_ids=[media_id])
-                    print(f"✅ [{when}] Tweet with image posted: {message} ({random_image})")
-                else:
-                    client.create_tweet(text=message)
-                    print(f"⚠️ [{when}] Media uploaded but no media_id — posted text only: {message}")
-
-            except Exception as e:
-                print("❌ Media upload error:", e)
-                try:
-                    client.create_tweet(text=message)
-                    print(f"✅ [{when}] Text-only fallback posted:", message)
-                except Exception as e2:
-                    print("❌ Failed to post text-only fallback:", e2)
-
+def tweet(text, image_path=None):
+    """Post a tweet with optional image."""
+    try:
+        if image_path:
+            media = api.media_upload(image_path)
+            media_id = getattr(media, "media_id", None)
+            client.create_tweet(text=text, media_ids=[media_id])
         else:
-            # No images present
-            try:
-                client.create_tweet(text=message)
-                print(f"✅ [{when}] Text-only tweet posted:", message)
-            except Exception as e:
-                print("❌ Error posting tweet:", e)
+            client.create_tweet(text=text)
 
+        print("✅ Tweet posted:", text)
     except Exception as e:
-        print("❌ Unexpected error in post_tweet:", e)
+        print("❌ Tweet error:", e)
 
 
 # ------------------------------------------------
-# 🎄 CHRISTMAS COUNTDOWN
+# 11:11 TWEETS
+# ------------------------------------------------
+
+def build_message(when):
+    date_str = datetime.now().strftime('%Y-%m-%d')
+
+    messages = {
+        "morning": f"Good morning! ☀ It's {date_str}. 11:11 — Have a bright day!",
+        "night":   f"Good Night! 🌙 It's {date_str}. 11:11 — Wishing you a peaceful night!"
+    }
+
+    return messages.get(when, f"It's {date_str} — Hello!")
+
+
+def post_tweet(when):
+    message = build_message(when)
+    img = get_random_image()
+    tweet(message, img)
+
+
+# ------------------------------------------------
+# 🎄 Christmas Countdown
 # ------------------------------------------------
 
 def days_until_christmas():
@@ -105,8 +96,10 @@ def days_until_christmas():
         xmas = date(today.year + 1, 12, 25)
     return (xmas - today).days
 
+
 def christmas_message():
     days = days_until_christmas()
+
     if days == 0:
         return "🎄 Merry Christmas! 🎅✨ Wishing everyone joy and blessings!"
     elif days == 1:
@@ -114,36 +107,92 @@ def christmas_message():
     else:
         return f"🎄 {days} days until Christmas! 🎅🎁 #ChristmasCountdown"
 
+
 def post_christmas_countdown():
+    tweet(christmas_message())
+
+
+# ------------------------------------------------
+# Quote Tweet
+# ------------------------------------------------
+
+def get_quote():
     try:
-        message = christmas_message()
-        client.create_tweet(text=message)
-        print(f"🎄 Countdown Tweet Posted: {message}")
+        response = requests.get(QUOTE_API_URL, headers={"X-Api-Key": QUOTE_API_KEY})
+        data = response.json()
+
+        if isinstance(data, list) and data:
+            q = data[0].get("quote", "")
+            a = data[0].get("author", "")
+            return f'"{q}"\n\n— {a}'
+    except:
+        pass
+
+    # Default fallback
+    return "Success is not final, failure is not fatal."
+
+
+def send_tweet():
+    tweet(get_quote())
+
+# ------------------------------------------------
+# Day in History
+# ------------------------------------------------
+
+def get_day_in_history():
+    url = "https://api.api-ninjas.com/v1/dayinhistory"
+    headers = {"X-Api-Key": "4v1qDs7dntxBJRt3HhQtYg==r9UAOHXWYL484RVc"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        data = response.json()
+
+        if isinstance(data, list) and len(data) > 0:
+            event = data[0].get("event", "")
+            year  = data[0].get("year", "")
+
+            return f"📜 Today in History ({year})\n\n{event}\n\n#History #TodayInHistory"
+
+        else:
+            return "📜 Today in history — No historical data available."
+
     except Exception as e:
-        print("❌ Error posting Christmas Countdown tweet:", e)
+        return f"Error fetching history: {e}"
+
+def send_day_in_history():
+    message = get_day_in_history()
+    tweet(message)  # uses your existing tweet() function
+
 
 
 # ------------------------------------------------
 # Scheduling
 # ------------------------------------------------
 
-# 11:11 AM
+# 11:11 tweets
 schedule.every().day.at("11:11").do(post_tweet, when="morning")
-
-# 11:11 PM
 schedule.every().day.at("23:11").do(post_tweet, when="night")
 
-# 🎄 Christmas Countdown (daily at 09:20)
-schedule.every().day.at("09:20").do(post_christmas_countdown)
+# Christmas countdown
+schedule.every().day.at("10:30").do(post_christmas_countdown)
 
-print("🤖 Bot Running…")
+# Day in History
+schedule.every().day.at("07:30").do(send_day_in_history)
+
+# Hourly Quotes: 06:00 → 22:00
+for hour in range(6, 23):
+    schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
+
+print("\n🤖 Bot Running…")
 print("⏰ 11:11 AM — Morning Tweet")
 print("⏰ 11:11 PM — Night Tweet")
-print("🎄 09:00 AM — Christmas Countdown Tweet")
+print("🎄 10:30 AM — Christmas Countdown")
+print("⏰ 06:00 AM → 10:00 PM — Hourly Quotes\n")
 
 while True:
     try:
         schedule.run_pending()
     except Exception as e:
         print("❌ Scheduler error:", e)
+
     time.sleep(30)
