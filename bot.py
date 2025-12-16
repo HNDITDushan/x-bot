@@ -12,10 +12,33 @@ import requests
 # ------------------------------------------------
 load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
-ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
+def create_twitter_client(prefix):
+    api_key = os.getenv(f"{prefix}_API_KEY")
+    api_secret = os.getenv(f"{prefix}_API_SECRET")
+    access_token = os.getenv(f"{prefix}_ACCESS_TOKEN")
+    access_secret = os.getenv(f"{prefix}_ACCESS_TOKEN_SECRET")
+
+    # v1.1 (media)
+    auth = tweepy.OAuth1UserHandler(
+        api_key, api_secret, access_token, access_secret
+    )
+    api = tweepy.API(auth)
+
+    # v2 (tweets)
+    client = tweepy.Client(
+        consumer_key=api_key,
+        consumer_secret=api_secret,
+        access_token=access_token,
+        access_token_secret=access_secret
+    )
+
+    return api, client
+
+
+# API_KEY = os.getenv("API_KEY")
+# API_SECRET = os.getenv("API_SECRET")
+# ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+# ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 
 IMAGE_FOLDER = "/Volumes/PortableSSD/Projects/x-bot/images"
 QUOTE_API_KEY = "4v1qDs7dntxBJRt3HhQtYg==r9UAOHXWYL484RVc"
@@ -24,15 +47,18 @@ QUOTE_API_URL = "https://api.api-ninjas.com/v2/randomquotes?categories=success,w
 # ------------------------------------------------
 # Twitter Auth
 # ------------------------------------------------
-auth = tweepy.OAuth1UserHandler(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-api = tweepy.API(auth)
+# auth = tweepy.OAuth1UserHandler(API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+# api = tweepy.API(auth)
 
-client = tweepy.Client(
-    consumer_key=API_KEY,
-    consumer_secret=API_SECRET,
-    access_token=ACCESS_TOKEN,
-    access_token_secret=ACCESS_TOKEN_SECRET
-)
+# client = tweepy.Client(
+#     consumer_key=API_KEY,
+#     consumer_secret=API_SECRET,
+#     access_token=ACCESS_TOKEN,
+#     access_token_secret=ACCESS_TOKEN_SECRET
+# )
+
+api_bot1, client_bot1 = create_twitter_client("BOT1")
+api_bot2, client_bot2 = create_twitter_client("BOT2")
 
 # ------------------------------------------------
 # Helper Functions
@@ -49,19 +75,17 @@ def get_random_image():
         return None
 
 
-def tweet(text, image_path=None):
-    """Post a tweet with optional image."""
+def tweet(text, client, api=None, image_path=None):
     try:
-        if image_path:
+        if image_path and api:
             media = api.media_upload(image_path)
-            media_id = getattr(media, "media_id", None)
-            client.create_tweet(text=text, media_ids=[media_id])
+            client.create_tweet(text=text, media_ids=[media.media_id])
         else:
             client.create_tweet(text=text)
 
-        print("✅ Tweet posted:", text)
+        print("✅ Tweet sent:", text)
     except Exception as e:
-        print("❌ Tweet error:", e)
+        print("❌ Tweet failed:", e)
 
 
 # ------------------------------------------------
@@ -82,7 +106,8 @@ def build_message(when):
 def post_tweet(when):
     message = build_message(when)
     img = get_random_image()
-    tweet(message, img)
+    tweet(message, client_bot1, api_bot1, img)
+
 
 
 # ------------------------------------------------
@@ -109,7 +134,7 @@ def christmas_message():
 
 
 def post_christmas_countdown():
-    tweet(christmas_message())
+    tweet(christmas_message(), client_bot1)
 
 
 # ------------------------------------------------
@@ -133,7 +158,7 @@ def get_quote():
 
 
 def send_tweet():
-    tweet(get_quote())
+    tweet(get_quote(), client_bot2)
 
 # ------------------------------------------------
 # Day in History
@@ -161,7 +186,8 @@ def get_day_in_history():
 
 def send_day_in_history():
     message = get_day_in_history()
-    tweet(message)  # uses your existing tweet() function
+    tweet(message, client_bot1)
+
 
 
 
@@ -179,8 +205,8 @@ schedule.every().day.at("10:30").do(post_christmas_countdown)
 # Day in History
 schedule.every().day.at("07:30").do(send_day_in_history)
 
-# Hourly Quotes: 06:00 → 22:00
-for hour in range(6, 23):
+# Hourly Quotes: 00:00 → 23:00
+for hour in range(0, 23):
     schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
 
 print("\n🤖 Bot Running…")
