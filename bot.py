@@ -96,7 +96,7 @@ def build_message(when):
     date_str = datetime.now().strftime('%Y-%m-%d')
 
     messages = {
-        "morning": f"Good morning! ☀ It's {date_str}. 11:11 — Have a bright day!",
+        "morning": f"Good Morning! ☀ It's {date_str}. 11:11 — Have a bright day!",
         "night":   f"Good Night! 🌙 It's {date_str}. 11:11 — Wishing you a peaceful night!"
     }
 
@@ -205,8 +205,8 @@ schedule.every().day.at("10:30").do(post_christmas_countdown)
 # Day in History
 schedule.every().day.at("07:30").do(send_day_in_history)
 
-# Hourly Quotes: 00:00 → 23:00
-for hour in range(0, 23):
+# Hourly Quotes: 06:00 AM → 10:00 PM
+for hour in range(5, 23):
     schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
 
 print("\n🤖 Bot Running…")
