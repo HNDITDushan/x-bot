@@ -258,7 +258,7 @@ for hour in range(5, 23):
     schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
     
 # Hourly BTC Update
-schedule.every().hour.at(":05").do(send_btc_update)
+schedule.every().hour.at(":30").do(send_btc_update)
 
 print("\n🤖 Bot Running…")
 print("⏰ 11:11 AM — Morning Tweet")
