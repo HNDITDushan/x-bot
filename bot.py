@@ -40,9 +40,15 @@ def create_twitter_client(prefix):
 # ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 # ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 
-IMAGE_FOLDER = "/Volumes/PortableSSD/Projects/x-bot/images"
-QUOTE_API_KEY = "4v1qDs7dntxBJRt3HhQtYg==r9UAOHXWYL484RVc"
+IMAGE_FOLDER = os.getenv("IMAGE_FOLDER")
+
+QUOTE_API_KEY_1 = os.getenv("QUOTE_API_KEY_1")
+QUOTE_API_KEY_2 = os.getenv("QUOTE_API_KEY_2")
+QUOTE_API_KEY_3 = os.getenv("QUOTE_API_KEY_3")
+
 QUOTE_API_URL = "https://api.api-ninjas.com/v2/randomquotes?categories=success,wisdom"
+DAY_OF_HISTORY_API_URL = "https://api.api-ninjas.com/v1/dayinhistory"
+BTC_API_URL = "https://api.api-ninjas.com/v1/bitcoin"
 
 # ------------------------------------------------
 # Twitter Auth
@@ -59,6 +65,7 @@ QUOTE_API_URL = "https://api.api-ninjas.com/v2/randomquotes?categories=success,w
 
 api_bot1, client_bot1 = create_twitter_client("BOT1")
 api_bot2, client_bot2 = create_twitter_client("BOT2")
+api_bot3, client_bot3 = create_twitter_client("BOT3")
 
 # ------------------------------------------------
 # Helper Functions
@@ -141,7 +148,7 @@ def post_christmas_countdown():
 # Quote Tweet
 # ------------------------------------------------
 
-def get_quote():
+def get_quote(QUOTE_API_KEY):
     try:
         response = requests.get(QUOTE_API_URL, headers={"X-Api-Key": QUOTE_API_KEY})
         data = response.json()
@@ -151,6 +158,7 @@ def get_quote():
             a = data[0].get("author", "")
             return f'"{q}"\n\n— {a}'
     except:
+        get_quote(QUOTE_API_KEY_2)
         pass
 
     # Default fallback
@@ -158,18 +166,16 @@ def get_quote():
 
 
 def send_tweet():
-    tweet(get_quote(), client_bot2)
+    tweet(get_quote(QUOTE_API_KEY_1), client_bot2)
 
 # ------------------------------------------------
 # Day in History
 # ------------------------------------------------
 
 def get_day_in_history():
-    url = "https://api.api-ninjas.com/v1/dayinhistory"
-    headers = {"X-Api-Key": "4v1qDs7dntxBJRt3HhQtYg==r9UAOHXWYL484RVc"}
-
+    
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(DAY_OF_HISTORY_API_URL, headers={"X-Api-Key": QUOTE_API_KEY_1})
         data = response.json()
 
         if isinstance(data, list) and len(data) > 0:
@@ -188,8 +194,36 @@ def send_day_in_history():
     message = get_day_in_history()
     tweet(message, client_bot1)
 
+# ------------------------------------------------
+# Hourly BTC Update
+# ------------------------------------------------
+
+def get_btc_price():
+    
+    try:
+        response = requests.get(BTC_API_URL, headers={"X-Api-Key": QUOTE_API_KEY_3}, timeout=10)
+        data = response.json()
+
+        if isinstance(data, dict):
+            price = data.get("price")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            return (
+                f"₿ Bitcoin (BTC) Update\n\n"
+                f"💰 Price: ${price:,}\n"
+                f"⏰ Time: {timestamp}\n\n"
+                f"#Bitcoin #BTC #Crypto"
+            )
+
+    except Exception as e:
+        return f"BTC update unavailable ❌\nError: {e}"
+
+    return "BTC price data not available."
 
 
+def send_btc_update():
+    message = get_btc_price()
+    tweet(message, client_bot3)
 
 # ------------------------------------------------
 # Scheduling
@@ -208,12 +242,16 @@ schedule.every().day.at("07:30").do(send_day_in_history)
 # Hourly Quotes: 06:00 AM → 10:00 PM
 for hour in range(5, 23):
     schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
+    
+# Hourly BTC Update
+schedule.every().hour.at(":00").do(send_btc_update)
 
 print("\n🤖 Bot Running…")
 print("⏰ 11:11 AM — Morning Tweet")
 print("⏰ 11:11 PM — Night Tweet")
 print("🎄 10:30 AM — Christmas Countdown")
 print("⏰ 06:00 AM → 10:00 PM — Hourly Quotes\n")
+print("⏰ Hourly BTC Update\n")
 
 while True:
     try:
