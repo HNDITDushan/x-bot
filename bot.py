@@ -199,26 +199,40 @@ def send_day_in_history():
 # ------------------------------------------------
 
 def get_btc_price():
-    
+   
     try:
         response = requests.get(BTC_API_URL, headers={"X-Api-Key": QUOTE_API_KEY_3}, timeout=10)
         data = response.json()
 
-        if isinstance(data, dict):
-            price = data.get("price")
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if not isinstance(data, dict):
+            return "BTC price data unavailable."
 
-            return (
-                f"₿ Bitcoin (BTC) Update\n\n"
-                f"💰 Price: ${price:,}\n"
-                f"⏰ Time: {timestamp}\n\n"
-                f"#Bitcoin #BTC #Crypto"
-            )
+        # Convert safely
+        price = float(data.get("price", 0))
+        change_24h = float(data.get("24h_price_change", 0))
+        change_pct = float(data.get("24h_price_change_percent", 0))
+        high_24h = float(data.get("24h_high", 0))
+        low_24h = float(data.get("24h_low", 0))
+        volume_24h = float(data.get("24h_volume", 0))
+
+        trend_emoji = "📈" if change_24h >= 0 else "📉"
+        sign = "+" if change_24h >= 0 else ""
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        return (
+            f"₿ Bitcoin (BTC) Update {trend_emoji}\n\n"
+            f"💰 Price: ${price:,.2f}\n"
+            f"{trend_emoji} 24h Change: {sign}${change_24h:,.2f} ({sign}{change_pct:.2f}%)\n"
+            f"🔼 24h High: ${high_24h:,.2f}\n"
+            f"🔽 24h Low: ${low_24h:,.2f}\n"
+            f"📊 Volume (24h): {volume_24h:,.4f} BTC\n"
+            f"⏰ {timestamp}\n\n"
+            f"#Bitcoin #BTC #Crypto"
+        )
 
     except Exception as e:
         return f"BTC update unavailable ❌\nError: {e}"
-
-    return "BTC price data not available."
 
 
 def send_btc_update():
@@ -244,7 +258,7 @@ for hour in range(5, 23):
     schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
     
 # Hourly BTC Update
-schedule.every().hour.at(":00").do(send_btc_update)
+schedule.every().hour.at(":05").do(send_btc_update)
 
 print("\n🤖 Bot Running…")
 print("⏰ 11:11 AM — Morning Tweet")
