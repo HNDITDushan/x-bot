@@ -66,6 +66,7 @@ BTC_API_URL = "https://api.api-ninjas.com/v1/bitcoin"
 api_bot1, client_bot1 = create_twitter_client("BOT1")
 api_bot2, client_bot2 = create_twitter_client("BOT2")
 api_bot3, client_bot3 = create_twitter_client("BOT3")
+api_bot4, client_bot4 = create_twitter_client("BOT4")
 
 # ------------------------------------------------
 # Helper Functions
@@ -237,7 +238,10 @@ def get_btc_price():
 
 def send_btc_update():
     message = get_btc_price()
-    tweet(message, client_bot3)
+    # print(message)
+    tweet(message, client_bot1)
+    # tweet(message, client_bot3)
+    # tweet(message, client_bot4)
 
 # ------------------------------------------------
 # Scheduling
@@ -264,8 +268,10 @@ print("\n🤖 Bot Running…")
 print("⏰ 11:11 AM — Morning Tweet")
 print("⏰ 11:11 PM — Night Tweet")
 print("🎄 10:30 AM — Christmas Countdown")
-print("⏰ 06:00 AM → 10:00 PM — Hourly Quotes\n")
+print("⏰ 06:00 AM → 10:00 PM — Hourly Quotes")
 print("⏰ Hourly BTC Update\n")
+
+# send_btc_update()  # Initial BTC update on startup
 
 while True:
     try:
