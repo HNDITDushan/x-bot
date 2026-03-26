@@ -7,6 +7,8 @@ import schedule
 import time
 import requests
 
+from image_with_quote import generate_image_with_quote
+
 # ------------------------------------------------
 # Load credentials
 # ------------------------------------------------
@@ -41,6 +43,7 @@ def create_twitter_client(prefix):
 # ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 
 IMAGE_FOLDER = os.getenv("IMAGE_FOLDER")
+IMAGE_FOLDER_QUOTES = os.getenv("IMAGE_FOLDER_QUOTES")
 
 QUOTE_API_KEY_1 = os.getenv("QUOTE_API_KEY_1")
 QUOTE_API_KEY_2 = os.getenv("QUOTE_API_KEY_2")
@@ -79,6 +82,16 @@ def get_random_image():
                  if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
 
         return os.path.join(IMAGE_FOLDER, random.choice(files)) if files else None
+    except Exception:
+        return None
+    
+def get_random_image_Quote():
+    """Return a random image path or None."""
+    try:
+        files = [f for f in os.listdir(IMAGE_FOLDER_QUOTES)
+                 if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
+
+        return os.path.join(IMAGE_FOLDER_QUOTES, random.choice(files)) if files else None
     except Exception:
         return None
 
@@ -157,6 +170,7 @@ def get_quote(QUOTE_API_KEY):
         if isinstance(data, list) and data:
             q = data[0].get("quote", "")
             a = data[0].get("author", "")
+            generate_image_with_quote(q, a)
             return f'"{q}"\n\n— {a}'
     except:
         get_quote(QUOTE_API_KEY_2)
@@ -167,7 +181,8 @@ def get_quote(QUOTE_API_KEY):
 
 
 def send_tweet():
-    tweet(get_quote(QUOTE_API_KEY_1), client_bot2)
+    img = get_random_image_Quote()
+    tweet(get_quote(QUOTE_API_KEY_1), client_bot2, img)
 
 # ------------------------------------------------
 # Day in History
@@ -259,7 +274,7 @@ schedule.every().day.at("07:30").do(send_day_in_history)
 
 # Hourly Quotes: 06:00 AM → 10:00 PM
 for hour in range(5, 23):
-    schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
+    schedule.every().day.at(f"{hour:02d}:27").do(send_tweet)
     
 # Hourly BTC Update
 schedule.every().hour.at(":45").do(send_btc_update)
