@@ -274,7 +274,7 @@ schedule.every().day.at("07:30").do(send_day_in_history)
 
 # Hourly Quotes: 06:00 AM → 10:00 PM
 for hour in range(5, 23):
-    schedule.every().day.at(f"{hour:02d}:27").do(send_tweet)
+    schedule.every().day.at(f"{hour:02d}:00").do(send_tweet)
     
 # Hourly BTC Update
 schedule.every().hour.at(":45").do(send_btc_update)
