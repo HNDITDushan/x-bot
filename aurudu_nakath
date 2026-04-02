@@ -1,0 +1,115 @@
+import tkinter as tk
+import requests
+from datetime import datetime
+import threading
+import time
+
+# 🔗 YOUR GOOGLE SHEET JSON URL
+SHEET_URL = "https://opensheet.elk.sh/1Wl3PkGUB85FQAiFCr2pvcuV3kYKU19qlb0tX-eqLji4/aurudu_countdown"
+
+events = []
+
+def fetch_data():
+    global events
+    try:
+        res = requests.get(SHEET_URL)
+        data = res.json()
+        # print("Data fetched:", data)
+        temp = []
+        for row in data:
+            event = row.get("Event")
+            time_str = row.get("Time")
+
+            dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+            temp.append((event, dt))
+
+        # sort by time
+        print(temp)
+        events[:] = sorted(temp, key=lambda x: x[1])
+
+    except Exception as e:
+        print("Error:", e)
+
+
+def get_countdown(target):
+    now = datetime.now()
+    diff = target - now
+
+    if diff.total_seconds() <= 0:
+        return "Started ✅"
+
+    days = diff.days
+    hours, remainder = divmod(diff.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    return f"{days:02d}d {hours:02d}h {minutes:02d}m {seconds:02d}s"
+
+
+def update_ui():
+    while True:
+        now = datetime.now()
+
+        display_text = ""
+        next_event_index = None
+
+        # find next event
+        for i, (event, t) in enumerate(events):
+            if t > now:
+                next_event_index = i
+                break
+
+        for i, (event, t) in enumerate(events):
+            countdown = get_countdown(t)
+
+            if i == next_event_index:
+                display_text += f"🔥 NEXT: {event}\n{countdown}\n\n"
+            else:
+                display_text += f"{event}\n{countdown}\n\n"
+
+        label.config(text=display_text)
+        time.sleep(1)
+
+
+def auto_refresh_data():
+    while True:
+        fetch_data()
+        time.sleep(60)  # refresh from sheet every 1 min
+
+
+def exit_fullscreen(event=None):
+    root.attributes("-fullscreen", False)
+
+
+def start():
+    fetch_data()
+
+    threading.Thread(target=update_ui, daemon=True).start()
+    threading.Thread(target=auto_refresh_data, daemon=True).start()
+
+
+# UI Setup
+root = tk.Tk()
+root.title("🎉 Aurudu Nakath Countdown")
+
+# Fullscreen
+root.attributes("-fullscreen", True)
+
+# Exit on ESC
+root.bind("<Escape>", exit_fullscreen)
+
+# Big font label
+label = tk.Label(
+    root,
+    text="Loading...",
+    font=("Arial", 40, "bold"),
+    fg="white",
+    bg="black",
+    justify="center"
+)
+
+label.pack(expand=True)
+
+# Start app
+start()
+
+root.mainloop()

@@ -181,8 +181,9 @@ def get_quote(QUOTE_API_KEY):
 
 
 def send_tweet():
-    img = get_random_image_Quote()
-    tweet(get_quote(QUOTE_API_KEY_1), client_bot2, img)
+    # img = get_random_image_Quote()
+    # print("Selected quote image:", img)
+    tweet(get_quote(QUOTE_API_KEY_1), client_bot2)
 
 # ------------------------------------------------
 # Day in History
